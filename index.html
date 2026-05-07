@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>智能安防 · 蓝牙监控助手</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <style>
+    :root {
+      --bg: #1a1a24;
+      --card: #242430;
+      --accent-red: #e74c3c;
+      --accent-green: #2ecc71;
+      --accent-yellow: #f39c12;
+      --text: #f0f0f5;
+      --text2: #a0a0b0;
+      --border: #3a3a4a;
+      --bar-bg: #2e2e3a;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: radial-gradient(circle at 30% 20%, #2a1e2e, #16121c);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .phone {
+      max-width: 420px;
+      width: 100%;
+      background: var(--bg);
+      border-radius: 44px;
+      padding: 18px 16px 24px;
+      box-shadow: 0 20px 45px rgba(0,0,0,0.7), inset 0 0 0 1px rgba(255,255,255,0.04);
+      border: 1px solid #4a3e5a;
+      color: var(--text);
+      position: relative;
+    }
+    .status-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #25243a;
+      border-radius: 30px;
+      padding: 8px 16px;
+      margin-bottom: 16px;
+      font-weight: 500;
+      font-size: 0.8rem;
+    }
+    .bt-area { display:flex; align-items:center; gap:8px; }
+    .led {
+      width: 11px; height: 11px; background: #5a5a7a; border-radius: 50%;
+      transition: 0.3s;
+    }
+    .led.active {
+      background: #2ecc71; box-shadow: 0 0 14px #2ecc71; animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:0.6; transform:scale(1);} 50%{opacity:1; transform:scale(1.15);} }
+    .clock { font-family: monospace; font-weight: 600; }
+    .btn {
+      background: #3a3a50; border: none; padding: 6px 14px; border-radius: 2rem;
+      font-weight: 600; font-size: 0.7rem; color: #fff; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 5px; border: 1px solid #5a5a76;
+      transition: 0.15s; white-space: nowrap;
+    }
+    .btn:active { transform: scale(0.95); background: #52526a; }
+    .btn-danger { background: #a03a2a; border-color: #c04a3a; }
+    .btn-send { background: #1a5c3a; border-color: #2e8b5a; }
+
+    .config-panel {
+      display: none; background: #25243a; border-radius: 18px; padding: 12px;
+      margin-bottom: 14px; border: 1px solid #4a3e5a; flex-direction: column; gap: 8px;
+    }
+    .config-panel input {
+      background: #1a1a24; border: 1px solid #4a3e5a; color: #fff; padding: 6px 10px;
+      border-radius: 16px; font-family: monospace; font-size: 0.65rem; flex:1; outline: none;
+    }
+    .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+
+    .sensor-card {
+      background: var(--card); border-radius: 22px; padding: 14px; margin-bottom: 14px;
+      border: 1px solid var(--border); display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+    }
+    .vibration-box {
+      grid-column: 1; display: flex; flex-direction: column; align-items: center;
+    }
+    .vib-value {
+      font-size: 2.4rem; font-weight: 800; color: #f5b042;
+    }
+    .vib-bar-bg {
+      width: 100%; height: 10px; background: var(--bar-bg); border-radius: 8px; margin: 8px 0;
+      overflow: hidden;
+    }
+    .vib-bar-fill {
+      height: 100%; width: 0%; background: linear-gradient(90deg, #f1c40f, #e67e22, #e74c3c);
+      border-radius: 8px; transition: width 0.3s;
+    }
+    .ir-box {
+      grid-column: 2; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    }
+    .ir-led {
+      width: 40px; height: 40px; border-radius: 50%; background: #3a3a4a;
+      box-shadow: 0 0 10px transparent; transition: 0.3s;
+    }
+    .ir-led.active { background: #e74c3c; box-shadow: 0 0 20px #e74c3c, 0 0 40px rgba(231,76,60,0.6); }
+    .ir-label { margin-top: 6px; font-size: 0.7rem; color: var(--text2); }
+
+    .threshold-panel {
+      background: var(--card); border-radius: 18px; padding: 12px; margin-bottom: 14px;
+      border: 1px solid var(--border); display: flex; align-items: center; gap: 12px;
+      flex-wrap: wrap;
+    }
+    .threshold-input {
+      width: 70px; background: #1a1a24; border: 1px solid #4a3e5a; color: #fff;
+      padding: 6px; border-radius: 12px; text-align: center; font-weight: 600;
+    }
+    .send-section {
+      background: var(--card); border-radius: 18px; padding: 12px; margin-bottom: 14px;
+      border: 1px solid var(--border);
+    }
+    .send-input {
+      width: 100%; background: #1a1a24; border: 1px solid #4a3e5a; color: #fff;
+      padding: 10px; border-radius: 16px; font-size: 0.8rem; margin-bottom: 8px; resize: vertical;
+    }
+    .preset-btns {
+      display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px;
+    }
+    .preset-btns button {
+      background: #2e3440; border: 1px solid #4a5a6a; color: #d0d8e0;
+      padding: 6px 12px; border-radius: 16px; font-size: 0.65rem; cursor: pointer;
+      transition: 0.1s;
+    }
+    .preset-btns button:active { background: #4a5a6a; }
+
+    .log-box {
+      background: #12121e; border-radius: 16px; padding: 10px; height: 110px;
+      overflow-y: auto; font-family: monospace; font-size: 0.65rem; color: #b0b0c0;
+      border: 1px solid #2e2e42; margin-top: 10px;
+    }
+    .alert-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center;
+      z-index: 100; backdrop-filter: blur(6px);
+    }
+    .alert-box {
+      background: #2c1e1e; border: 2px solid #e74c3c; border-radius: 24px;
+      padding: 20px; text-align: center; max-width: 300px; color: #fff;
+      box-shadow: 0 0 30px rgba(231,76,60,0.8); animation: shakeAlert 0.5s;
+    }
+    @keyframes shakeAlert {
+      0%,100%{ transform: translate(0); }
+      25%{ transform: translate(-5px, 0); }
+      75%{ transform: translate(5px, 0); }
+    }
+    .alert-box button { margin-top: 12px; }
+  </style>
+</head>
+<body>
+<div class="phone">
+  <!-- 状态栏 -->
+  <div class="status-bar">
+    <div class="bt-area">
+      <div class="led" id="bleLed"></div>
+      <span id="connStatus">未连接</span>
+      <button class="btn" id="configToggleBtn"><i class="fas fa-cog"></i></button>
+    </div>
+    <div class="clock" id="liveClock">--:--:--</div>
+  </div>
+
+  <!-- 蓝牙配置 -->
+  <div class="config-panel" id="configPanel">
+    <div class="row">
+      <input id="serviceUuid" value="0000fff0-0000-1000-8000-00805f9b34fb" placeholder="服务UUID">
+      <input id="notifyUuid" value="0000fff1-0000-1000-8000-00805f9b34fb" placeholder="通知UUID">
+      <input id="writeUuid" value="0000fff1-0000-1000-8000-00805f9b34fb" placeholder="写入UUID">
+    </div>
+    <div class="row">
+      <button class="btn" id="scanBtn">扫描</button>
+      <button class="btn" id="connectBtn" disabled>连接</button>
+      <button class="btn btn-danger" id="disconnectBtn" disabled>断开</button>
+      <button class="btn" id="simulateBtn"><i class="fas fa-random"></i> 模拟数据</button>
+    </div>
+  </div>
+
+  <!-- 传感器数据卡片 -->
+  <div class="sensor-card">
+    <div class="vibration-box">
+      <span style="font-size:0.7rem; color:var(--text2);">📳 震动量</span>
+      <span class="vib-value" id="vibrationVal">0.0</span>
+      <div class="vib-bar-bg"><div class="vib-bar-fill" id="vibBar" style="width:0%"></div></div>
+    </div>
+    <div class="ir-box">
+      <div class="ir-led" id="irLed"></div>
+      <span class="ir-label" id="irLabel">红外：未触发</span>
+    </div>
+  </div>
+
+  <!-- 阈值设置 -->
+  <div class="threshold-panel">
+    <span style="font-weight:600; font-size:0.8rem;">⚙️ 震动阈值</span>
+    <input type="number" id="thresholdInput" class="threshold-input" value="5.0" step="0.1" min="0">
+    <span style="font-size:0.65rem; color:var(--text2);">超过时报警</span>
+    <button class="btn" id="testAlertBtn"><i class="fas fa-bell"></i> 测试报警</button>
+  </div>
+
+  <!-- 下发消息区域 -->
+  <div class="send-section">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+      <span style="font-weight:600;">📤 自定义下发中文</span>
+      <button class="btn" id="savePresetBtn"><i class="fas fa-save"></i> 保存当前</button>
+    </div>
+    <textarea id="sendText" class="send-input" rows="2" placeholder="输入要发送的中文内容..."></textarea>
+    <div class="preset-btns" id="presetContainer">
+      <!-- 预设短语动态加载 -->
+    </div>
+    <button class="btn btn-send" id="sendMsgBtn" style="width:100%;"><i class="fas fa-paper-plane"></i> 发送消息</button>
+  </div>
+
+  <!-- 日志 -->
+  <div class="log-box" id="logBox">
+    <div>🔔 智能安防助手就绪</div>
+  </div>
+</div>
+
+<!-- 警报弹窗 -->
+<div class="alert-overlay" id="alertOverlay">
+  <div class="alert-box">
+    <div style="font-size:2rem;">🚨</div>
+    <div style="font-weight:800; font-size:1.2rem; margin:8px 0;" id="alertTitle">震动超标！</div>
+    <div id="alertMsg" style="font-size:0.8rem;">请检查现场情况</div>
+    <button class="btn btn-danger" id="closeAlertBtn">确认并关闭</button>
+  </div>
+</div>
+
+<script>
+  (function() {
+    // DOM
+    const bleLed = document.getElementById('bleLed');
+    const connStatus = document.getElementById('connStatus');
+    const configToggleBtn = document.getElementById('configToggleBtn');
+    const configPanel = document.getElementById('configPanel');
+    const scanBtn = document.getElementById('scanBtn');
+    const connectBtn = document.getElementById('connectBtn');
+    const disconnectBtn = document.getElementById('disconnectBtn');
+    const simulateBtn = document.getElementById('simulateBtn');
+    const serviceUuidInput = document.getElementById('serviceUuid');
+    const notifyUuidInput = document.getElementById('notifyUuid');
+    const writeUuidInput = document.getElementById('writeUuid');
+    const vibrationValSpan = document.getElementById('vibrationVal');
+    const vibBar = document.getElementById('vibBar');
+    const irLed = document.getElementById('irLed');
+    const irLabel = document.getElementById('irLabel');
+    const thresholdInput = document.getElementById('thresholdInput');
+    const testAlertBtn = document.getElementById('testAlertBtn');
+    const sendText = document.getElementById('sendText');
+    const sendMsgBtn = document.getElementById('sendMsgBtn');
+    const savePresetBtn = document.getElementById('savePresetBtn');
+    const presetContainer = document.getElementById('presetContainer');
+    const logBox = document.getElementById('logBox');
+    const clockSpan = document.getElementById('liveClock');
+    const alertOverlay = document.getElementById('alertOverlay');
+    const alertTitle = document.getElementById('alertTitle');
+    const alertMsg = document.getElementById('alertMsg');
+    const closeAlertBtn = document.getElementById('closeAlertBtn');
+
+    let bluetoothDevice = null;
+    let gattServer = null;
+    let notifyChar = null;
+    let writeChar = null;
+    let isConnected = false;
+    let currentVibration = 0;
+    let threshold = 5.0;
+    let irTriggered = false;
+    let presets = []; // 保存的下发短语
+
+    // 时钟
+    function updateClock() {
+      clockSpan.textContent = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // 日志
+    function addLog(msg, type='info') {
+      const div = document.createElement('div');
+      div.style.color = type==='rx'?'#2ecc71': type==='tx'?'#3498db':'#b0b0c0';
+      div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      logBox.appendChild(div);
+      logBox.scrollTop = logBox.scrollHeight;
+      if(logBox.children.length > 30) logBox.removeChild(logBox.children[0]);
+    }
+
+    // 更新连接UI
+    function updateConnectionUI(connected) {
+      isConnected = connected;
+      bleLed.classList.toggle('active', connected);
+      connStatus.textContent = connected ? '已连接' : '未连接';
+      connectBtn.disabled = connected || !bluetoothDevice;
+      disconnectBtn.disabled = !connected;
+      scanBtn.disabled = connected;
+    }
+
+    // 更新传感器显示
+    function updateSensors(vibration, ir) {
+      currentVibration = vibration;
+      irTriggered = ir === 1;
+      vibrationValSpan.textContent = vibration.toFixed(1);
+      let percent = Math.min(100, Math.max(0, (vibration / 20) * 100)); // 假设20为满量程
+      vibBar.style.width = percent + '%';
+      if (irTriggered) {
+        irLed.classList.add('active');
+        irLabel.textContent = '红外：已触发';
+        irLabel.style.color = '#e74c3c';
+      } else {
+        irLed.classList.remove('active');
+        irLabel.textContent = '红外：未触发';
+        irLabel.style.color = '#a0a0b0';
+      }
+      // 检查阈值
+      const thresh = parseFloat(thresholdInput.value) || 5.0;
+      if (vibration > thresh) {
+        triggerAlert(vibration, thresh);
+      }
+    }
+
+    // 警报处理
+    function triggerAlert(vibration, threshold) {
+      if (alertOverlay.style.display === 'flex') return; // 已经显示
+      alertOverlay.style.display = 'flex';
+      alertTitle.textContent = `震动超标！`;
+      alertMsg.textContent = `当前震动 ${vibration.toFixed(1)} > 阈值 ${threshold.toFixed(1)}，请立即检查。`;
+      // 语音播报
+      const speakText = `警告，震动超标，当前值${vibration.toFixed(1)}，超过阈值${threshold.toFixed(1)}`;
+      speakChinese(speakText);
+      addLog(`🚨 警报触发: 震动${vibration.toFixed(1)} > ${threshold.toFixed(1)}`, 'rx');
+    }
+
+    function speakChinese(text) {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.lang = 'zh-CN';
+        utter.rate = 1.0;
+        window.speechSynthesis.speak(utter);
+      }
+    }
+
+    closeAlertBtn.addEventListener('click', () => {
+      alertOverlay.style.display = 'none';
+      window.speechSynthesis.cancel();
+    });
+
+    testAlertBtn.addEventListener('click', () => {
+      const thresh = parseFloat(thresholdInput.value) || 5.0;
+      triggerAlert(6.0, thresh); // 模拟超标
+    });
+
+    // 解析数据 #震动量#红外是否触发#
+    function parseSensorData(raw) {
+      const match = raw.match(/#([\d.]+)#(\d)#/);
+      if (match) {
+        const vibration = parseFloat(match[1]);
+        const ir = parseInt(match[2]);
+        if (!isNaN(vibration) && (ir === 0 || ir === 1)) {
+          updateSensors(vibration, ir);
+          addLog(`📥 震动:${vibration.toFixed(1)} 红外:${ir}`, 'rx');
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function onNotification(event) {
+      const val = event.target.value;
+      if (!val) return;
+      const raw = new TextDecoder('utf-8').decode(val).trim();
+      parseSensorData(raw);
+    }
+
+    // 发送消息
+    async function sendMessage(text) {
+      if (!text.trim()) return;
+      if (!isConnected || !writeChar) {
+        addLog('未连接，无法发送', 'tx');
+        return;
+      }
+      try {
+        await writeChar.writeValue(new TextEncoder().encode(text));
+        addLog(`📤 下发: ${text}`, 'tx');
+      } catch(e) {
+        addLog(`发送失败: ${e.message}`, 'tx');
+      }
+    }
+
+    sendMsgBtn.addEventListener('click', () => {
+      sendMessage(sendText.value);
+    });
+
+    // 预设短语管理
+    function loadPresets() {
+      try {
+        const saved = localStorage.getItem('security_presets');
+        if (saved) presets = JSON.parse(saved);
+        else presets = ['警报！有人闯入', '请撤离现场', '设备自检正常', '远程呼叫'];
+      } catch(e) { presets = ['警报！', '测试']; }
+      renderPresets();
+    }
+    function savePresets() {
+      localStorage.setItem('security_presets', JSON.stringify(presets));
+    }
+    function renderPresets() {
+      presetContainer.innerHTML = '';
+      presets.forEach((text, index) => {
+        const btn = document.createElement('button');
+        btn.textContent = text;
+        btn.addEventListener('click', () => {
+          sendText.value = text;
+          sendMessage(text);
+        });
+        // 长按删除？简单加个删除按钮
+        const delBtn = document.createElement('button');
+        delBtn.textContent = '✕';
+        delBtn.style.background = 'transparent';
+        delBtn.style.color = '#e74c3c';
+        delBtn.style.border = 'none';
+        delBtn.style.cursor = 'pointer';
+        delBtn.style.padding = '0 4px';
+        delBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          presets.splice(index, 1);
+          savePresets();
+          renderPresets();
+        });
+        btn.appendChild(delBtn);
+        presetContainer.appendChild(btn);
+      });
+    }
+    savePresetBtn.addEventListener('click', () => {
+      const text = sendText.value.trim();
+      if (text && !presets.includes(text)) {
+        presets.push(text);
+        savePresets();
+        renderPresets();
+        addLog('已保存预设短语');
+      }
+    });
+
+    // 蓝牙操作
+    async function scan() {
+      if (!navigator.bluetooth) { alert('需要Web Bluetooth'); return; }
+      const svc = serviceUuidInput.value.trim();
+      if (!svc) return alert('输入服务UUID');
+      try {
+        const device = await navigator.bluetooth.requestDevice({
+          filters: [{ services: [svc] }],
+          optionalServices: [svc]
+        });
+        bluetoothDevice = device;
+        connectBtn.disabled = false;
+        addLog(`已选择设备: ${device.name || device.id}`);
+      } catch(e) {
+        if (!e.message.includes('cancelled')) addLog(`扫描错误: ${e.message}`);
+      }
+    }
+
+    async function connect() {
+      if (!bluetoothDevice) return;
+      const svc = serviceUuidInput.value.trim();
+      const ntf = notifyUuidInput.value.trim();
+      const wrt = writeUuidInput.value.trim();
+      try {
+        gattServer = await bluetoothDevice.gatt.connect();
+        const service = await gattServer.getPrimaryService(svc);
+        notifyChar = await service.getCharacteristic(ntf);
+        await notifyChar.startNotifications();
+        notifyChar.addEventListener('characteristicvaluechanged', onNotification);
+        if (wrt) {
+          try { writeChar = await service.getCharacteristic(wrt); } catch(e) {}
+        }
+        updateConnectionUI(true);
+        bluetoothDevice.addEventListener('gattserverdisconnected', onDisconnect);
+        addLog('✅ 蓝牙已连接');
+      } catch(e) {
+        addLog(`连接失败: ${e.message}`);
+        updateConnectionUI(false);
+      }
+    }
+
+    function onDisconnect() {
+      addLog('设备断开');
+      if (notifyChar) notifyChar.removeEventListener('characteristicvaluechanged', onNotification);
+      notifyChar = null;
+      writeChar = null;
+      updateConnectionUI(false);
+    }
+
+    function disconnect() {
+      if (bluetoothDevice && bluetoothDevice.gatt.connected) bluetoothDevice.gatt.disconnect();
+      else onDisconnect();
+    }
+
+    // 模拟数据
+    function simulateData() {
+      const vibration = (Math.random() * 8).toFixed(1);
+      const ir = Math.random() < 0.4 ? 1 : 0;
+      const raw = `#${vibration}#${ir}#`;
+      parseSensorData(raw);
+    }
+
+    configToggleBtn.addEventListener('click', ()=> configPanel.style.display = configPanel.style.display==='none'?'flex':'none');
+    scanBtn.addEventListener('click', scan);
+    connectBtn.addEventListener('click', connect);
+    disconnectBtn.addEventListener('click', disconnect);
+    simulateBtn.addEventListener('click', simulateData);
+
+    // 初始化
+    loadPresets();
+    updateConnectionUI(false);
+    updateSensors(0, 0);
+    addLog('智能安防监控已启动');
+  })();
+</script>
+</body>
+</html>

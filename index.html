@@ -209,14 +209,14 @@
   <!-- 下发消息区域 -->
   <div class="send-section">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-      <span style="font-weight:600;">📤 自定义下发中文</span>
+      <span style="font-weight:600;">📤 下发纯中文消息</span>
       <button class="btn" id="savePresetBtn"><i class="fas fa-save"></i> 保存当前</button>
     </div>
-    <textarea id="sendText" class="send-input" rows="2" placeholder="输入要发送的中文内容..."></textarea>
+    <textarea id="sendText" class="send-input" rows="2" placeholder="输入纯中文内容，无需添加任何符号"></textarea>
     <div class="preset-btns" id="presetContainer">
-      <!-- 预设短语动态加载 -->
+      <!-- 预设短语 -->
     </div>
-    <button class="btn btn-send" id="sendMsgBtn" style="width:100%;"><i class="fas fa-paper-plane"></i> 发送消息</button>
+    <button class="btn btn-send" id="sendMsgBtn" style="width:100%;"><i class="fas fa-paper-plane"></i> 发送中文</button>
   </div>
 
   <!-- 日志 -->
@@ -237,7 +237,7 @@
 
 <script>
   (function() {
-    // DOM
+    // DOM 元素
     const bleLed = document.getElementById('bleLed');
     const connStatus = document.getElementById('connStatus');
     const configToggleBtn = document.getElementById('configToggleBtn');
@@ -272,9 +272,8 @@
     let writeChar = null;
     let isConnected = false;
     let currentVibration = 0;
-    let threshold = 5.0;
     let irTriggered = false;
-    let presets = []; // 保存的下发短语
+    let presets = [];
 
     // 时钟
     function updateClock() {
@@ -293,7 +292,6 @@
       if(logBox.children.length > 30) logBox.removeChild(logBox.children[0]);
     }
 
-    // 更新连接UI
     function updateConnectionUI(connected) {
       isConnected = connected;
       bleLed.classList.toggle('active', connected);
@@ -303,12 +301,11 @@
       scanBtn.disabled = connected;
     }
 
-    // 更新传感器显示
     function updateSensors(vibration, ir) {
       currentVibration = vibration;
       irTriggered = ir === 1;
       vibrationValSpan.textContent = vibration.toFixed(1);
-      let percent = Math.min(100, Math.max(0, (vibration / 20) * 100)); // 假设20为满量程
+      let percent = Math.min(100, Math.max(0, (vibration / 20) * 100));
       vibBar.style.width = percent + '%';
       if (irTriggered) {
         irLed.classList.add('active');
@@ -319,22 +316,18 @@
         irLabel.textContent = '红外：未触发';
         irLabel.style.color = '#a0a0b0';
       }
-      // 检查阈值
       const thresh = parseFloat(thresholdInput.value) || 5.0;
       if (vibration > thresh) {
         triggerAlert(vibration, thresh);
       }
     }
 
-    // 警报处理
     function triggerAlert(vibration, threshold) {
-      if (alertOverlay.style.display === 'flex') return; // 已经显示
+      if (alertOverlay.style.display === 'flex') return;
       alertOverlay.style.display = 'flex';
       alertTitle.textContent = `震动超标！`;
       alertMsg.textContent = `当前震动 ${vibration.toFixed(1)} > 阈值 ${threshold.toFixed(1)}，请立即检查。`;
-      // 语音播报
-      const speakText = `警告，震动超标，当前值${vibration.toFixed(1)}，超过阈值${threshold.toFixed(1)}`;
-      speakChinese(speakText);
+      speakChinese(`警告，震动超标，当前值${vibration.toFixed(1)}，超过阈值${threshold.toFixed(1)}`);
       addLog(`🚨 警报触发: 震动${vibration.toFixed(1)} > ${threshold.toFixed(1)}`, 'rx');
     }
 
@@ -355,7 +348,7 @@
 
     testAlertBtn.addEventListener('click', () => {
       const thresh = parseFloat(thresholdInput.value) || 5.0;
-      triggerAlert(6.0, thresh); // 模拟超标
+      triggerAlert(6.0, thresh);
     });
 
     // 解析数据 #震动量#红外是否触发#
@@ -380,16 +373,25 @@
       parseSensorData(raw);
     }
 
-    // 发送消息
-    async function sendMessage(text) {
-      if (!text.trim()) return;
+    // ★ 核心修改：发送纯中文，去除所有 # 和多余空白，不添加任何额外符号
+    function prepareChineseText(text) {
+      // 只保留中文字符、字母、数字、常用标点（逗号句号等），去掉#和换行符等
+      return text.replace(/[#\n\r]/g, '').trim();
+    }
+
+    async function sendMessage(originalText) {
+      const cleanText = prepareChineseText(originalText);
+      if (!cleanText) {
+        addLog('请输入有效中文内容', 'tx');
+        return;
+      }
       if (!isConnected || !writeChar) {
         addLog('未连接，无法发送', 'tx');
         return;
       }
       try {
-        await writeChar.writeValue(new TextEncoder().encode(text));
-        addLog(`📤 下发: ${text}`, 'tx');
+        await writeChar.writeValue(new TextEncoder().encode(cleanText));
+        addLog(`📤 下发中文: ${cleanText}`, 'tx');
       } catch(e) {
         addLog(`发送失败: ${e.message}`, 'tx');
       }
@@ -402,14 +404,14 @@
     // 预设短语管理
     function loadPresets() {
       try {
-        const saved = localStorage.getItem('security_presets');
+        const saved = localStorage.getItem('security_presets_v2');
         if (saved) presets = JSON.parse(saved);
-        else presets = ['警报！有人闯入', '请撤离现场', '设备自检正常', '远程呼叫'];
-      } catch(e) { presets = ['警报！', '测试']; }
+        else presets = ['警报有人闯入', '请撤离现场', '设备自检正常', '远程呼叫支援'];
+      } catch(e) { presets = ['警报', '测试']; }
       renderPresets();
     }
     function savePresets() {
-      localStorage.setItem('security_presets', JSON.stringify(presets));
+      localStorage.setItem('security_presets_v2', JSON.stringify(presets));
     }
     function renderPresets() {
       presetContainer.innerHTML = '';
@@ -420,7 +422,6 @@
           sendText.value = text;
           sendMessage(text);
         });
-        // 长按删除？简单加个删除按钮
         const delBtn = document.createElement('button');
         delBtn.textContent = '✕';
         delBtn.style.background = 'transparent';
@@ -439,7 +440,7 @@
       });
     }
     savePresetBtn.addEventListener('click', () => {
-      const text = sendText.value.trim();
+      const text = prepareChineseText(sendText.value);
       if (text && !presets.includes(text)) {
         presets.push(text);
         savePresets();
@@ -502,7 +503,6 @@
       else onDisconnect();
     }
 
-    // 模拟数据
     function simulateData() {
       const vibration = (Math.random() * 8).toFixed(1);
       const ir = Math.random() < 0.4 ? 1 : 0;
@@ -520,7 +520,7 @@
     loadPresets();
     updateConnectionUI(false);
     updateSensors(0, 0);
-    addLog('智能安防监控已启动');
+    addLog('智能安防监控已启动 (纯中文下发模式)');
   })();
 </script>
 </body>
